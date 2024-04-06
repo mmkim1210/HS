@@ -1,4 +1,5 @@
 [deps]
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 FreqTables = "da1fdf0e-e0ff-5433-a45f-9bb5ff651cb1"
+GLM = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
 XLSX = "fdbf4ff8-1666-58a4-91e7-1b58723a45e0"

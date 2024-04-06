@@ -1,4 +1,4 @@
-using XLSX, DataFrames, FreqTables
+using XLSX, DataFrames, FreqTables, GLM
 
 df = DataFrame(XLSX.readtable("data/data.xlsx", 1))
 
@@ -53,14 +53,67 @@ begin
     df.svi_htype_trans = Vector{Union{Missing, Float64}}(df.svi_htype_trans)
     df.svi_total[df.svi_total .== "."] .= missing
     df.svi_total = Vector{Union{Missing, Float64}}(df.svi_total)
+    dict = Dict(
+        "."                => missing, 
+        "SHRINE|EDU:<10"   => 1, 
+        "SHRINE|EDU:10-20" => 2, 
+        "SHRINE|EDU:20-30" => 3, 
+        "SHRINE|EDU:30-40" => 4,
+        "SHRINE|EDU:40-50" => 5,
+        "SHRINE|EDU:50-60" => 6,
+        "SHRINE|EDU:60-70" => 7,
+        "SHRINE|EDU:70-80" => 8,
+        )
+    storage = Union{Missing, Int}[]
+    for row in 1:size(df, 1)
+        push!(storage, dict[df.edu[row]])
+    end
+    df.edu_converted = storage
+    dict = Dict(
+        "."                    => missing, 
+        "SHRINE|INC:25k-35k"   => 1,
+        "SHRINE|INC:35k-50k"   => 2, 
+        "SHRINE|INC:50k-75k"   => 3, 
+        "SHRINE|INC:75k-100k"  => 4, 
+        "SHRINE|INC:100k-150k" => 5,
+        "SHRINE|INC:150k-200k" => 6,
+        "SHRINE|INC:200k-250k" => 7,
+        "SHRINE|INC:250k-300k" => 8,
+        "SHRINE|INC:>300k"     => 9,
+        )
+    storage = Union{Missing, Int}[]
+    for row in 1:size(df, 1)
+        push!(storage, dict[df.income[row]])
+    end
+    df.income_converted = storage
+    dict = Dict(
+        "."       => missing, 
+        "0-0.1"   => 1,
+        "0.1-0.2" => 2, 
+        "0.2-0.3" => 3, 
+        "0.3-0.4" => 4, 
+        "0.4-0.5" => 5,
+        "0.5-0.6" => 6,
+        "0.6-0.7" => 7,
+        "0.7-0.8" => 8,
+        "0.8-0.9" => 9,
+        "0.9-1"   => 10
+        )
+    storage = Union{Missing, Int}[]
+    for row in 1:size(df, 1)
+        push!(storage, dict[df.hpi_percentile[row]])
+    end
+    df.hpi_percentile_converted = storage
 end
 
 begin
     df.er_visits_total_ucla .= Int.(df.er_visits_total_ucla)
 end
 
-show(unique(df.svi_total))
-freqtable(df, "income")
+unique(df.hpi_percentile_converted)
+freqtable(df, :hpi_percentile_converted)
+
+glm(@formula(er_visits_total_ucla ~ sex), df, Poisson())
 
 # ignored the following covariates: zip, race, marital_status, sexual_orientation, religion, occupation, dx_duration, hurley_stage, primary_ruci, sec_ruci
 # ignored the following outcome variables: er_visits_total_all and management/treatment-related outcomes
