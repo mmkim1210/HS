@@ -1,4 +1,4 @@
-using XLSX, DataFrames, FreqTables, GLM
+using XLSX, DataFrames, FreqTables, GLM, Dates
 
 df = DataFrame(XLSX.readtable("data/data.xlsx", 1))
 
@@ -104,16 +104,46 @@ begin
         push!(storage, dict[df.hpi_percentile[row]])
     end
     df.hpi_percentile_converted = storage
+    for i in 1:18
+        storage = Vector{Union{Missing, Date}}(missing, size(df, 1))
+        ind = df[!, "er$(i)_date"] .!= "."
+        storage[ind] .= Date.(df[ind, "er$(i)_date"])
+        df[!, "er$(i)_date"] = storage
+    end    
 end
 
 begin
     df.er_visits_total_ucla .= Int.(df.er_visits_total_ucla)
 end
 
+unique(df.ethnicity)
+unique(df.insurance)
 unique(df.hpi_percentile_converted)
 freqtable(df, :hpi_percentile_converted)
 
 glm(@formula(er_visits_total_ucla ~ sex), df, Poisson())
+glm(@formula(er_visits_total_ucla ~ derm_ever), df, Poisson())
+glm(@formula(er_visits_total_ucla ~ ethnicity), df, Poisson(), contrasts = Dict(:ethnicity => DummyCoding(base = "Not Hispanic or Latino")))
+glm(@formula(er_visits_total_ucla ~ insurance), df, Poisson(), contrasts = Dict(:insurance => DummyCoding(base = "Commercial")))
+glm(@formula(er_visits_total_ucla ~ age), df, Poisson())
+glm(@formula(er_visits_total_ucla ~ tx_prior_n), df, Poisson())
+glm(@formula(er_visits_total_ucla ~ lesion_loc_n), df, Poisson())
+glm(@formula(er_visits_total_ucla ~ adi_natrank), df, Poisson())
+glm(@formula(er_visits_total_ucla ~ adi_staterank), df, Poisson())
+glm(@formula(er_visits_total_ucla ~ svi_socio_econ), df, Poisson())
+glm(@formula(er_visits_total_ucla ~ svi_hcomp), df, Poisson())
+glm(@formula(er_visits_total_ucla ~ svi_mino_lang), df, Poisson())
+glm(@formula(er_visits_total_ucla ~ svi_htype_trans), df, Poisson())
+glm(@formula(er_visits_total_ucla ~ svi_total), df, Poisson())
+glm(@formula(er_visits_total_ucla ~ edu_converted), df, Poisson())
+glm(@formula(er_visits_total_ucla ~ income_converted), df, Poisson())
+glm(@formula(er_visits_total_ucla ~ hpi_percentile_converted), df, Poisson())
+
+glm(@formula(er_visits_total_ucla ~ sex + insurance + lesion_loc_n + svi_socio_econ + svi_mino_lang + svi_total + edu_converted + income_converted + hpi_percentile_converted), df, Poisson(), contrasts = Dict(:insurance => DummyCoding(base = "Commercial")))
+# nobs(glm(@formula(er_visits_total_ucla ~ sex + insurance + lesion_loc_n + svi_socio_econ + svi_mino_lang + svi_total + edu_converted + income_converted + hpi_percentile_converted), df, Poisson(), contrasts = Dict(:insurance => DummyCoding(base = "Commercial"))))
+# dropmissing(df, ["sex", "insurance", "lesion_loc_n", "svi_socio_econ", "svi_mino_lang", "svi_total", "edu_converted", "income_converted","hpi_percentile_converted"])
+
+glm(@formula(er_visits_total_ucla ~ hpi_percentile_converted), df, NegativeBinomial(), LogLink())
 
 # ignored the following covariates: zip, race, marital_status, sexual_orientation, religion, occupation, dx_duration, hurley_stage, primary_ruci, sec_ruci
 # ignored the following outcome variables: er_visits_total_all and management/treatment-related outcomes
