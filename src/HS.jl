@@ -1,4 +1,4 @@
-using XLSX, DataFrames, FreqTables, GLM, Dates
+using XLSX, DataFrames, FreqTables, GLM, Dates, Statistics, CairoMakie
 
 df = DataFrame(XLSX.readtable("data/data.xlsx", 1))
 
@@ -24,6 +24,7 @@ begin
     end
     df.tx_prior_combined = storage
     df.tx_prior_n = length.(storage)
+    [df[!, col] = map(x -> ifelse(x == "yes", 1, 0), df[:, col]) for col in cols]
     df[df.lesion_loc_genitals .== "YES", "lesion_loc_genitals"] .= "yes"
     df[df.lesion_loc_other .!= "no", "lesion_loc_other"] .= "yes"
     cols = ["lesion_loc_axillae", "lesion_loc_breast", "lesion_loc_abd", "lesion_loc_pubic", "lesion_loc_genitals", "lesion_loc_buttocks", "lesion_loc_thigh", "lesion_loc_other"]
@@ -39,6 +40,7 @@ begin
     end
     df.lesion_loc_combined = storage
     df.lesion_loc_n = length.(storage)
+    [df[!, col] = map(x -> ifelse(x == "yes", 1, 0), df[:, col]) for col in cols]
     df.adi_natrank[df.adi_natrank .== "."] .= missing
     df.adi_natrank = Vector{Union{Missing, Int}}(df.adi_natrank)
     df.adi_staterank[df.adi_staterank .== "."] .= missing
@@ -143,7 +145,61 @@ glm(@formula(er_visits_total_ucla ~ sex + insurance + lesion_loc_n + svi_socio_e
 # nobs(glm(@formula(er_visits_total_ucla ~ sex + insurance + lesion_loc_n + svi_socio_econ + svi_mino_lang + svi_total + edu_converted + income_converted + hpi_percentile_converted), df, Poisson(), contrasts = Dict(:insurance => DummyCoding(base = "Commercial"))))
 # dropmissing(df, ["sex", "insurance", "lesion_loc_n", "svi_socio_econ", "svi_mino_lang", "svi_total", "edu_converted", "income_converted","hpi_percentile_converted"])
 
-glm(@formula(er_visits_total_ucla ~ hpi_percentile_converted), df, NegativeBinomial(), LogLink())
+negbin(@formula(er_visits_total_ucla ~ sex), df, LogLink())
+negbin(@formula(er_visits_total_ucla ~ derm_ever), df, LogLink())
+negbin(@formula(er_visits_total_ucla ~ ethnicity), df, LogLink()) # contrasts not working?
+negbin(@formula(er_visits_total_ucla ~ insurance), df, LogLink())
+negbin(@formula(er_visits_total_ucla ~ age), df, LogLink())
+negbin(@formula(er_visits_total_ucla ~ tx_prior_n), df, LogLink())
+negbin(@formula(er_visits_total_ucla ~ lesion_loc_n), df, LogLink())
+negbin(@formula(er_visits_total_ucla ~ adi_natrank), df, LogLink())
+negbin(@formula(er_visits_total_ucla ~ adi_staterank), df, LogLink())
+negbin(@formula(er_visits_total_ucla ~ svi_socio_econ), df, LogLink())
+negbin(@formula(er_visits_total_ucla ~ svi_hcomp), df, LogLink())
+negbin(@formula(er_visits_total_ucla ~ svi_mino_lang), df, LogLink())
+negbin(@formula(er_visits_total_ucla ~ svi_htype_trans), df, LogLink())
+negbin(@formula(er_visits_total_ucla ~ svi_total), df, LogLink())
+negbin(@formula(er_visits_total_ucla ~ edu_converted), df, LogLink())
+negbin(@formula(er_visits_total_ucla ~ income_converted), df, LogLink())
+negbin(@formula(er_visits_total_ucla ~ hpi_percentile_converted), df, LogLink())
+# glm(@formula(er_visits_total_ucla ~ hpi_percentile_converted), df, NegativeBinomial(), LogLink())
+
+negbin(@formula(er_visits_total_ucla ~ sex + insurance + lesion_loc_n + svi_socio_econ + svi_mino_lang + svi_total + edu_converted + income_converted + hpi_percentile_converted), df, LogLink())
+
+glm(@formula(er_visits_total_ucla ~ tx_prior_combined), df, Poisson())
+
+cols = ["lesion_loc_axillae", "lesion_loc_breast", "lesion_loc_abd", "lesion_loc_pubic", "lesion_loc_genitals", "lesion_loc_buttocks", "lesion_loc_thigh", "lesion_loc_other"]
+cols = ["tx_prior_abx", "tx_prior_id", "tx_prior_surg", "tx_prior_topicals", "tx_prior_ocp-and/or-spiro", "tx_prior_metformin", "tx_prior_steroid", "tx_prior_biologic", "tx_prior_retinoid", "tx_prior_zinc", "tx_prior_unspec"]
+cor(Matrix(df[!, cols]))
+
+begin
+    f = Figure()
+    ax = Axis(f[1, 1], title = "Distribution of UCLA ER visits due to HS exacerbations for HS patients")
+    hist!(ax, df.er_visits_total_ucla)
+    ax.ylabel = "Count"
+    ax.xlabel = "Number of ER visits"
+    save("distribution.png", f, px_per_unit = 4)
+end
+
+begin
+    f = Figure()
+    ax = Axis(f[1, 1], title = "Number of UCLA ER visits by number of HS lesions")
+    rainclouds!(ax, df.lesion_loc_n, df.er_visits_total_ucla, plot_boxplots = false, clouds = nothing, markersize = 10, jitter_width = 0.25)
+    ax.ylabel = "Raw or unadjusted number of ER visits"
+    ax.xlabel = "Number of HS lesions"
+    n1, n2 = extrema(df.lesion_loc_n)
+    ax.xticks = (collect(n1:n2), string.(collect(n1:n2)))
+    save("lesions.png", f, px_per_unit = 4)
+end
+
+begin
+    f = Figure()
+    ax = Axis(f[1, 1], title = "Number of UCLA ER visits by education level")
+    rainclouds!(ax, df.edu_converted, df.er_visits_total_ucla, plot_boxplots = false, clouds = nothing, markersize = 10, jitter_width = 0.25)
+    ax.ylabel = "Raw or unadjusted number of ER visits"
+    ax.xlabel = "Eudcation level"
+    save("education.png", f, px_per_unit = 4)
+end
 
 # ignored the following covariates: zip, race, marital_status, sexual_orientation, religion, occupation, dx_duration, hurley_stage, primary_ruci, sec_ruci
 # ignored the following outcome variables: er_visits_total_all and management/treatment-related outcomes
